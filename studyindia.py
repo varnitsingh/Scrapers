@@ -19,6 +19,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, RemoteDriverServerException
 
+
 class StudyIndia:
     def __init__(self) -> None:
         # Logger stuff
@@ -42,15 +43,15 @@ class StudyIndia:
         except:
             pass
 
-    def load_json_file(self,filename) -> dict:
+    def load_json_file(self, filename) -> dict:
         data = {}
-        with open(filename,'r') as rf:
+        with open(filename, 'r') as rf:
             data = json.load(rf)
         return data
 
-    def save_json_file(self,filename,data:dict):
-        with open(filename,'w') as wf:
-            json.dump(data,wf)
+    def save_json_file(self, filename, data: dict):
+        with open(filename, 'w') as wf:
+            json.dump(data, wf)
 
     def get_links(self):
         options = Options()
@@ -60,7 +61,8 @@ class StudyIndia:
         # self.driver.maximize_window()
         for letter in list(string.ascii_uppercase):
             self.log.info(f"Doing: {letter}")
-            self.driver.get(f'http://www.studyguideindia.com/Colleges/default.asp?cat={letter}')
+            self.driver.get(
+                f'http://www.studyguideindia.com/Colleges/default.asp?cat={letter}')
             time.sleep(3)
             xpath = '//td/a'
             links = self.load_json_file('database/links.json')
@@ -74,10 +76,11 @@ class StudyIndia:
                     except:
                         pass
 
-                self.save_json_file('database/links.json',links)
+                self.save_json_file('database/links.json', links)
                 try:
-                    element = self.driver.find_element(By.LINK_TEXT,'Next>>')
-                    self.driver.execute_script("arguments[0].click();", element)
+                    element = self.driver.find_element(By.LINK_TEXT, 'Next>>')
+                    self.driver.execute_script(
+                        "arguments[0].click();", element)
                     time.sleep(5)
                     self.log.info(f"[{letter}]Clicked page: {count}")
                     count += 1
@@ -86,21 +89,37 @@ class StudyIndia:
                     self.log.info("Couldn't click next page.")
                     break
 
-    def extract_details(self,url):
+    def extract_details(self, url):
         self.driver.get(url)
         xpath = "(//div[@id='college_details-new']//table)[1]//td"
         odd = True
         key = 'temp'
-        data = {'url':url}
+        data = {'url': url}
         for i in range(len(self.driver.find_elements(By.XPATH, xpath))):
             if odd:
-                key = self.driver.find_element(By.XPATH, f"({xpath})[{i+1}]").text.strip()
+                key = self.driver.find_element(
+                    By.XPATH, f"({xpath})[{i+1}]").text.strip()
                 odd = False
             else:
-                data[key] = self.driver.find_element(By.XPATH, f"({xpath})[{i+1}]").text.strip()
+                data[key] = self.driver.find_element(
+                    By.XPATH, f"({xpath})[{i+1}]").text.strip()
                 odd = True
 
         return data
+
+    def save_to_csv(self,data):
+        keys = ['url', 'College Name', 'Type of Institution', 'Category', 'Address', 'Phone', 'Fax', 'Website', 'Approved By', 'E-Mail', 'Affiliated to', 'Sub Type of Institution']
+        row = []
+        for key in keys:
+            if key in data:
+                row.append(data[key])
+            else:
+                row.append(None)
+
+        with open('database/colleges.csv','a',encoding='utf-8-sig') as wf:
+            writer = csv.writer(wf)
+            writer.writerow(row)
+
 
     def query_colleges(self):
         colleges = self.load_json_file('database/links.json')
@@ -110,7 +129,7 @@ class StudyIndia:
             options=options, executable_path='./geckodriver')
         count = self.load_json_file('database/progress.json')['count']
         length = len(colleges)
-        data = self.load_json_file('database/colleges.json')
+        # data = self.load_json_file('database/colleges.json')
         i = 1
         for college in colleges.keys():
             if i < count:
@@ -118,13 +137,14 @@ class StudyIndia:
                 continue
             self.log.info(f"{count}/{length}")
             try:
-                data[college] = self.extract_details(college)
+                data = self.extract_details(college)
+                self.save_to_csv(data)
             except:
                 self.log.info('Sleeping for 5 mins.')
                 time.sleep(60*5)
-            self.save_json_file('database/colleges.json',data)
+            # self.save_json_file('database/colleges.json', data)
             count += 1
-            self.save_json_file('database/progress.json',{"count":count})
+            self.save_json_file('database/progress.json', {"count": count})
 
     def generate_csv(self):
         colleges = self.load_json_file('database/colleges.json')
@@ -135,10 +155,9 @@ class StudyIndia:
         df = pd.DataFrame(data)
         df.to_csv('database/colleges.csv')
 
+
 if __name__ == '__main__':
     S = StudyIndia()
     S.query_colleges()
     # S.generate_csv()
     # print(len(S.load_json_file('database/colleges.json')))
-
-    
